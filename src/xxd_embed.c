@@ -15,7 +15,7 @@ typedef struct xxd_entry {
 /* Head of the singly-linked list of registered resources. */
 static xxd_entry* xxd_index = NULL;
 
-void xxd_add(const char* name, const char* content, size_t size, const char* mime)
+void XXD_CALL xxd_add(const char* name, const char* content, size_t size, const char* mime)
 {
   xxd_entry* entry = (xxd_entry*)malloc(sizeof(xxd_entry));
   entry->name = name;
@@ -26,7 +26,7 @@ void xxd_add(const char* name, const char* content, size_t size, const char* mim
   xxd_index = entry;
 }
 
-const char* xxd_get(const char* name, size_t* size, const char** mime)
+const char* XXD_CALL xxd_get(const char* name, size_t* size, const char** mime)
 {
   if (!xxd_index) {
     fprintf(stderr,
