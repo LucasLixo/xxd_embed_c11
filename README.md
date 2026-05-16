@@ -37,8 +37,8 @@ target_link_libraries(xxd_example xxd::xxd)
 
 int main(int argc, char* argv[])
 {
-    printf("%s", xxd_get("text", NULL, NULL));
-    printf("%s", xxd_get("rect", NULL, NULL));
+    printf("text.txt\n%s\n", xxd_get("text", NULL, NULL));
+    printf("rect.svg\n%s\n", xxd_get("rect", NULL, NULL));
     return 0;
 }
 ```
