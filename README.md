@@ -1,6 +1,6 @@
 # Embed resources into binary with XXD and CMake
 
-Embed resources into binary with XXD and CMake in a cross-platform way (Linux, Windows, macOS and [Android](#Android) support).
+Embed resources into binary with XXD and CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
 
 XXD converts the data file into a C array, which is slow to compile for large files, due to the way how compiler handles large static arrays. In order to embed large files, please use [res_embed](https://github.com/dmikushin/res_embed.git) instead.
 
