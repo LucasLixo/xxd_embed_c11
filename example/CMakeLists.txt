@@ -1,8 +1,9 @@
 # Initialize source file list
-set(SRCS "example.cpp")
+set(SRCS "example.c")
 
-# Embed resource file into C++ source
-xxd_embed("resource" "${CMAKE_CURRENT_SOURCE_DIR}/resource" SRCS)
+# Embed resource file into C source
+xxd_embed("text" "${CMAKE_CURRENT_SOURCE_DIR}/text.txt" SRCS)
+xxd_embed("rect" "${CMAKE_CURRENT_SOURCE_DIR}/rect.svg" SRCS)
 
 # Build example executable
 add_executable(xxd_example ${SRCS})

@@ -1,11 +1,11 @@
 # Set minimum CMake version
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.5)
 
 # Read hex content from generated file
 file(READ ${FILE_HEX} CONTENT_HEX)
 
 # Generate SHA256 hash of file key for unique identifiers
-string(SHA256 FILE_NAME_HASH ${FILE_KEY})
+string(SHA256 FILE_KEY_HASH ${FILE_KEY})
 
 # Detect MIME type of the file (optional)
 find_program(XDG_MIME xdg-mime)
@@ -16,5 +16,5 @@ else()
     set(FILE_MIME "unsupported")
 endif()
 
-# Generate C++ source file from template, substituting hex content
+# Generate C source file from template, substituting hex content
 configure_file("${CMAKE_CURRENT_INCLUDE_DIR}/xxd.in" ${EMBED_FILE_PATH})
