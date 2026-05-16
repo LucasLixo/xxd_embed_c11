@@ -56,6 +56,26 @@ Configure from the command line:
 cmake -B build -DXXD_BUILD_STATIC=ON -DXXD_BUILD_EXAMPLE=OFF
 ```
 
+### CMake Policy CMP0118
+
+This project requires CMake policy CMP0118 to be set to `NEW`. This policy is necessary so that generated assets (e.g., xxd_embed outputs) attached via `INTERFACE` sources on a target in one directory are accepted by consumer targets defined in other directories.
+
+Add the following to your `CMakeLists.txt` before including this project:
+
+```cmake
+# Policy CMP0118: GENERATED source-file property is global across directory scopes.
+# Required so generated assets (e.g. xxd_embed outputs) attached via INTERFACE sources
+# on a target in one directory are accepted by consumer targets defined in other
+# directories. CMAKE_POLICY_DEFAULT_CMP0118 survives subdirectory cmake_minimum_required
+# resets (which would otherwise unset CMP0118, introduced in CMake 3.20).
+set(CMAKE_POLICY_DEFAULT_CMP0118 NEW)
+if(POLICY CMP0118)
+    cmake_policy(SET CMP0118 NEW)
+endif()
+```
+
+Note: `CMAKE_POLICY_DEFAULT_CMP0118` survives subdirectory `cmake_minimum_required` resets, which would otherwise unset CMP0118 (introduced in CMake 3.20).
+
 ## CMake macro
 
 ```cmake

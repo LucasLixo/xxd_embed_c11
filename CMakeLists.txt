@@ -1,6 +1,12 @@
 # Set minimum CMake version
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
+# Make GENERATED source-file property visible across directory scopes
+# so consumer targets defined in other directories can compile xxd_embed outputs.
+if(POLICY CMP0118)
+    cmake_policy(SET CMP0118 NEW)
+endif()
+
 # Project definition
 project(xxd VERSION 1.0.0 LANGUAGES C)
 
