@@ -1,8 +1,8 @@
 # Set minimum CMake version
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 # Project definition
-project(xxd)
+project(xxd VERSION 1.0.0 LANGUAGES C)
 
 # Options to build
 option(XXD_BUILD_STATIC "Build static library" ON)

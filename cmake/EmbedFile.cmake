@@ -1,5 +1,5 @@
 # Set minimum CMake version
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
 # Read hex content from generated file
 file(READ ${FILE_HEX} CONTENT_HEX)
