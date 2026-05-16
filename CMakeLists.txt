@@ -12,8 +12,25 @@ option(XXD_BUILD_EXAMPLE "Build example executable" ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Build xxd command-line utility from C source
-add_executable(xxd ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd.c)
+# Build the xxd host tool or locate it — must run on the build machine, not the target device.
+if(CMAKE_CROSSCOMPILING)
+    # When cross-compiling (e.g. Android NDK), xxd cannot be compiled for the host here.
+    # Require an existing xxd installation on the build machine.
+    find_program(XXD_HOST_EXECUTABLE xxd)
+    if(NOT XXD_HOST_EXECUTABLE)
+        message(FATAL_ERROR
+            "Cross-compiling requires xxd to be installed on the build host.\n"
+            "  Debian/Ubuntu: sudo apt install xxd\n"
+            "  macOS:         brew install vim\n"
+            "  Windows (WSL): sudo apt install xxd")
+    endif()
+    set(XXD_TOOL_CMD "${XXD_HOST_EXECUTABLE}")
+    set(XXD_TOOL_DEPS "")
+else()
+    add_executable(xxd ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd.c)
+    set(XXD_TOOL_CMD $<TARGET_FILE:xxd>)
+    set(XXD_TOOL_DEPS xxd)
+endif()
 
 # Build static library for xxd functionality
 if(${XXD_BUILD_STATIC})
@@ -57,9 +74,9 @@ macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     # Generate hex file using xxd utility
     add_custom_command(
         OUTPUT ${FILE_HEX}
-        COMMAND $<TARGET_FILE:xxd> -i < ${FILE_PATH} > ${FILE_HEX}
+        COMMAND ${XXD_TOOL_CMD} -i < ${FILE_PATH} > ${FILE_HEX}
         COMMENT "Generating hex representation of ${FILE_PATH} file content"
-        DEPENDS ${FILE_PATH} xxd)
+        DEPENDS ${FILE_PATH} ${XXD_TOOL_DEPS})
     set_source_files_properties("${FILE_HEX}" PROPERTIES GENERATED TRUE)
 
     # Generate C source file embedding the hex content

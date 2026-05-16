@@ -1,6 +1,6 @@
 # Embed resources into binary with XXD and CMake
 
-Embed resources into binary with XXD and CMake in a cross-platform way (Linux, Windows and Mac support).
+Embed resources into binary with XXD and CMake in a cross-platform way (Linux, Windows, macOS and Android support).
 
 XXD converts the data file into a C array, which is slow to compile for large files, due to the way how compiler handles large static arrays. In order to embed large files, please use [res_embed](https://github.com/dmikushin/res_embed.git) instead.
 
@@ -92,6 +92,100 @@ const char* xxd_get(const char* name, size_t* size, const char** mime);
 ```
 
 `xxd_add` is called automatically at program startup for every file embedded via `xxd_embed` — user code only needs to call `xxd_get`.
+
+## Platform notes
+
+### Android (NDK cross-compilation)
+
+The `xxd` utility must run on the **build host** at configure time to generate the hex files. When cross-compiling with the Android NDK, CMake cannot build a host executable automatically, so `xxd` must be available on the build machine beforehand.
+
+#### Step 1 — Install the NDK
+
+In Android Studio open `File → Settings → Languages & Frameworks → Android SDK → SDK Tools`, tick **NDK (Side by side)** and apply. Note the version number shown (e.g. `30.0.14904198`). The NDK is installed at:
+
+```
+# Windows
+%LOCALAPPDATA%\Android\Sdk\ndk\<version>\
+
+# Linux / macOS
+$HOME/Android/Sdk/ndk/<version>/
+```
+
+#### Step 2 — Make xxd available on the host
+
+`xxd` must be accessible in `PATH` on the build machine. Alternatively, pass its path directly via `-DXXD_HOST_EXECUTABLE=...` at configure time (see Step 3).
+
+```bash
+# Debian / Ubuntu
+sudo apt install xxd
+
+# macOS
+brew install vim # xxd ships with vim
+
+# Windows — build the host tool from this project first, then add it to PATH
+cmake -B build_host -S . -DXXD_BUILD_EXAMPLE=OFF
+cmake --build build_host --target xxd
+# build_host\xxd.exe is now available — pass it via -DXXD_HOST_EXECUTABLE below
+```
+
+#### Step 3 — Configure for Android
+
+**Linux / macOS:**
+```bash
+cmake -B build_android -S . \
+    -DCMAKE_TOOLCHAIN_FILE=$HOME/Android/Sdk/ndk/<version>/build/cmake/android.toolchain.cmake \
+    -DANDROID_ABI=arm64-v8a \
+    -DANDROID_PLATFORM=android-21 \
+    -DXXD_BUILD_STATIC=ON \
+    -DXXD_BUILD_EXAMPLE=OFF
+```
+
+**Windows (PowerShell):**
+```powershell
+cmake -B build_android -S . `
+    -DCMAKE_TOOLCHAIN_FILE="$env:LOCALAPPDATA\Android\Sdk\ndk\<version>\build\cmake\android.toolchain.cmake" `
+    -DANDROID_ABI=arm64-v8a `
+    -DANDROID_PLATFORM=android-21 `
+    -DXXD_BUILD_STATIC=ON `
+    -DXXD_BUILD_EXAMPLE=OFF `
+    -DXXD_HOST_EXECUTABLE="build_host\xxd.exe"
+```
+
+#### Step 4 — Build
+
+```
+cmake --build build_android
+```
+
+The output is `build_android/libxxd.a` (or `build_android\libxxd.a` on Windows).
+
+#### Step 5 — Verify (optional)
+
+Confirm the library targets AArch64:
+
+```powershell
+# Windows — using the NDK's llvm-readelf
+& "$env:LOCALAPPDATA\Android\Sdk\ndk\<version>\toolchains\llvm\prebuilt\windows-x86_64\bin\llvm-readelf.exe" `
+  --file-headers build_android\libxxd.a
+```
+
+```bash
+# Linux / macOS
+llvm-readelf --file-headers build_android/libxxd.a
+```
+
+Expected output includes `Machine: AArch64` and `Type: REL (Relocatable file)`.
+
+#### Supported ABIs
+
+| ABI | Description |
+|-----|-------------|
+| `arm64-v8a` | 64-bit ARM — modern devices (recommended) |
+| `armeabi-v7a` | 32-bit ARM — older devices |
+| `x86` | 32-bit x86 — emulator |
+| `x86_64` | 64-bit x86 — emulator |
+
+`XXD_BUILD_STATIC=ON` is the default and required for Android — it produces `libxxd.a` that links cleanly into your APK via the NDK.
 
 ## License
 
