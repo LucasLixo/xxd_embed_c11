@@ -10,7 +10,11 @@
 #    define XXD_EMBED_API __declspec(dllimport)
 #  endif
 #else
-#  define XXD_EMBED_API
+#  if defined(__GNUC__) && defined(XXD_EXPORTS)
+#    define XXD_EMBED_API __attribute__((visibility("default")))
+#  else
+#    define XXD_EMBED_API
+#  endif
 #endif
 
 #include <stddef.h>
