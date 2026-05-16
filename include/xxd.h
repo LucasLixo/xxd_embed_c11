@@ -2,7 +2,9 @@
 #define XXD_H
 
 #ifdef _WIN32
-#  ifdef libxxd_EXPORTS
+#  ifdef XXD_STATIC
+#    define XXD_EMBED_API
+#  elif defined(XXD_EXPORTS)
 #    define XXD_EMBED_API __declspec(dllexport)
 #  else
 #    define XXD_EMBED_API __declspec(dllimport)

@@ -4,7 +4,8 @@ cmake_minimum_required(VERSION 3.5)
 # Project definition
 project(xxd)
 
-# Option to build example executable
+# Options to build
+option(XXD_BUILD_STATIC "Build static library" ON)
 option(XXD_BUILD_EXAMPLE "Build example executable" ON)
 
 # Configure C standard to C11
@@ -14,12 +15,24 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # Build xxd command-line utility from C source
 add_executable(xxd ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd.c)
 
-# Build shared library for xxd functionality
-add_library(libxxd SHARED
+# Build static library for xxd functionality
+if(${XXD_BUILD_STATIC})
+	add_library(libxxd STATIC)
+else()
+	add_library(libxxd SHARED)
+endif()
+
+# Add source files for the library, including the embedding logic and headers
+target_sources(libxxd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd_embed.c
     ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd.in
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedFile.cmake)
+
+# Propagate XXD_STATIC so consumers skip dllimport decorators
+if(${XXD_BUILD_STATIC})
+    target_compile_definitions(libxxd PUBLIC XXD_STATIC)
+endif()
 
 # Set C standard for library
 set_property(TARGET libxxd PROPERTY C_STANDARD 11)
