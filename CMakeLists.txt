@@ -72,10 +72,16 @@ add_library(xxd::xxd ALIAS libxxd)
 # Cache the include directory path for use in macros
 set(CMAKE_CURRENT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include" CACHE STRING "" FORCE)
 
+# Cache the binary directory of this submodule so xxd_embed (which expands in the
+# caller's scope) writes its generated .hex/.c files here, not in the caller's
+# CMAKE_CURRENT_BINARY_DIR. Consumers may override XXD_EMBED_BINARY_DIR before
+# calling xxd_embed to redirect output elsewhere.
+set(XXD_EMBED_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}" CACHE PATH "Directory for xxd_embed generated files")
+
 # Macro: Convert file into a binary blob and embed it into a C source file
 macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     # Translate file content into comma-separated hex byte codes
-    set(FILE_HEX "${CMAKE_CURRENT_BINARY_DIR}/${FILE_KEY}.hex")
+    set(FILE_HEX "${XXD_EMBED_BINARY_DIR}/${FILE_KEY}.hex")
 
     # Generate hex file using xxd utility
     add_custom_command(
@@ -86,7 +92,7 @@ macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     set_source_files_properties("${FILE_HEX}" PROPERTIES GENERATED TRUE)
 
     # Generate C source file embedding the hex content
-    set(EMBED_FILE_PATH "${CMAKE_CURRENT_BINARY_DIR}/${FILE_KEY}.c")
+    set(EMBED_FILE_PATH "${XXD_EMBED_BINARY_DIR}/${FILE_KEY}.c")
     add_custom_command(
         OUTPUT ${EMBED_FILE_PATH}
         COMMAND ${CMAKE_COMMAND} -DCMAKE_CURRENT_INCLUDE_DIR=${CMAKE_CURRENT_INCLUDE_DIR} -DFILE_HEX=${FILE_HEX} -DFILE_KEY=${FILE_KEY} -DFILE_PATH=${FILE_PATH} -DEMBED_FILE_PATH=${EMBED_FILE_PATH} -P ${CMAKE_CURRENT_INCLUDE_DIR}/../cmake/EmbedFile.cmake
