@@ -1,8 +1,8 @@
 # Embed resources into binary with XXD and CMake
 
-Embed resources into binary with XXD and CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
+Embed resources into binary with CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
 
-XXD converts the data file into a C array, which is slow to compile for large files, due to the way how compiler handles large static arrays. In order to embed large files, please use [res_embed](https://github.com/dmikushin/res_embed.git) instead.
+**Requires CMake 3.20 or higher** for native hex conversion support (no external dependencies).
 
 ## Example
 
@@ -47,6 +47,7 @@ int main(int argc, char* argv[])
 
 | Option | Default | Description |
 |--------|---------|-------------|
+| `XXD_BUILD_EXECUTABLE` | `ON` | Build the `xxd` standalone executable. Set to `OFF` to disable (binary resources will still embed correctly via CMake scripts). |
 | `XXD_BUILD_STATIC` | `ON` | Build `libxxd` as a static library. Set to `OFF` to build as a shared library (`.dll`/`.so`). |
 | `XXD_BUILD_EXAMPLE` | `ON` | Build the bundled example executable. |
 
@@ -117,7 +118,7 @@ const char* xxd_get(const char* name, size_t* size, const char** mime);
 
 ### Android (NDK cross-compilation)
 
-The `xxd` utility must run on the **build host** at configure time to generate the hex files. When cross-compiling with the Android NDK, CMake cannot build a host executable automatically, so `xxd` must be available on the build machine beforehand.
+Since version 1.1.0, this project uses native CMake hex conversion (no external tools needed). Resource embedding works automatically on all platforms including Android.
 
 #### Step 1 — Install the NDK
 
@@ -131,24 +132,7 @@ In Android Studio open `File → Settings → Languages & Frameworks → Android
 $HOME/Android/Sdk/ndk/<version>/
 ```
 
-#### Step 2 — Make xxd available on the host
-
-`xxd` must be accessible in `PATH` on the build machine. Alternatively, pass its path directly via `-DXXD_HOST_EXECUTABLE=...` at configure time (see Step 3).
-
-```bash
-# Debian / Ubuntu
-sudo apt install xxd
-
-# macOS
-brew install vim # xxd ships with vim
-
-# Windows — build the host tool from this project first, then add it to PATH
-cmake -B build_host -S . -DXXD_BUILD_EXAMPLE=OFF
-cmake --build build_host --target xxd
-# build_host\xxd.exe is now available — pass it via -DXXD_HOST_EXECUTABLE below
-```
-
-#### Step 3 — Configure for Android
+#### Step 2 — Configure for Android
 
 **Linux / macOS:**
 ```bash
@@ -167,11 +151,10 @@ cmake -B build_android -S . `
     -DANDROID_ABI=arm64-v8a `
     -DANDROID_PLATFORM=android-21 `
     -DXXD_BUILD_STATIC=ON `
-    -DXXD_BUILD_EXAMPLE=OFF `
-    -DXXD_HOST_EXECUTABLE="build_host\xxd.exe"
+    -DXXD_BUILD_EXAMPLE=OFF
 ```
 
-#### Step 4 — Build
+#### Step 3 — Build
 
 ```
 cmake --build build_android
@@ -179,7 +162,7 @@ cmake --build build_android
 
 The output is `build_android/libxxd.a` (or `build_android\libxxd.a` on Windows).
 
-#### Step 5 — Verify (optional)
+#### Step 4 — Verify (optional)
 
 Confirm the library targets AArch64:
 

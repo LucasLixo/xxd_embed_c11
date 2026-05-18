@@ -1,5 +1,5 @@
 # Set minimum CMake version
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 
 # Make GENERATED source-file property visible across directory scopes
 # so consumer targets defined in other directories can compile xxd_embed outputs.
@@ -8,9 +8,10 @@ if(POLICY CMP0118)
 endif()
 
 # Project definition
-project(xxd VERSION 1.0.0 LANGUAGES C)
+project(xxd VERSION 1.1.0 LANGUAGES C)
 
 # Options to build
+option(XXD_BUILD_EXECUTABLE "Build xxd as standalone executable" ON)
 option(XXD_BUILD_STATIC "Build static library" ON)
 option(XXD_BUILD_EXAMPLE "Build example executable" ON)
 
@@ -18,24 +19,10 @@ option(XXD_BUILD_EXAMPLE "Build example executable" ON)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Build the xxd host tool or locate it — must run on the build machine, not the target device.
-if(CMAKE_CROSSCOMPILING)
-    # When cross-compiling (e.g. Android NDK), xxd cannot be compiled for the host here.
-    # Require an existing xxd installation on the build machine.
-    find_program(XXD_HOST_EXECUTABLE xxd)
-    if(NOT XXD_HOST_EXECUTABLE)
-        message(FATAL_ERROR
-            "Cross-compiling requires xxd to be installed on the build host.\n"
-            "  Debian/Ubuntu: sudo apt install xxd\n"
-            "  macOS:         brew install vim\n"
-            "  Windows (WSL): sudo apt install xxd")
-    endif()
-    set(XXD_TOOL_CMD "${XXD_HOST_EXECUTABLE}")
-    set(XXD_TOOL_DEPS "")
-else()
+# Build xxd executable (optional - not required for embedding functionality)
+if(XXD_BUILD_EXECUTABLE)
     add_executable(xxd ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd.c)
-    set(XXD_TOOL_CMD $<TARGET_FILE:xxd>)
-    set(XXD_TOOL_DEPS xxd)
+    set_property(TARGET xxd PROPERTY C_STANDARD 11)
 endif()
 
 # Build static library for xxd functionality
@@ -83,12 +70,12 @@ macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     # Translate file content into comma-separated hex byte codes
     set(FILE_HEX "${XXD_EMBED_BINARY_DIR}/${FILE_KEY}.hex")
 
-    # Generate hex file using xxd utility
+    # Generate hex file using CMake script (no external dependencies)
     add_custom_command(
         OUTPUT ${FILE_HEX}
-        COMMAND ${XXD_TOOL_CMD} -i < ${FILE_PATH} > ${FILE_HEX}
+        COMMAND ${CMAKE_COMMAND} -DINPUT_FILE=${FILE_PATH} -DOUTPUT_FILE=${FILE_HEX} -P ${CMAKE_CURRENT_INCLUDE_DIR}/../cmake/GenerateHex.cmake
         COMMENT "Generating hex representation of ${FILE_PATH} file content"
-        DEPENDS ${FILE_PATH} ${XXD_TOOL_DEPS})
+        DEPENDS ${FILE_PATH})
     set_source_files_properties("${FILE_HEX}" PROPERTIES GENERATED TRUE)
 
     # Generate C source file embedding the hex content
