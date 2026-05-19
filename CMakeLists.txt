@@ -68,7 +68,10 @@ set(XXD_EMBED_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}" CACHE PATH "Directory for
 # Macro: Convert file into a binary blob and embed it into a C source file
 macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     # Translate file content into comma-separated hex byte codes
-    set(FILE_HEX "${XXD_EMBED_BINARY_DIR}/${FILE_KEY}.hex")
+    set(FILE_HEX "${XXD_EMBED_BINARY_DIR}/Generated/${FILE_KEY}.hex")
+
+    # Ensure Generated directory exists
+    file(MAKE_DIRECTORY "${XXD_EMBED_BINARY_DIR}/Generated")
 
     # Generate hex file using CMake script (no external dependencies)
     add_custom_command(
@@ -79,7 +82,7 @@ macro(xxd_embed FILE_KEY FILE_PATH SOURCES)
     set_source_files_properties("${FILE_HEX}" PROPERTIES GENERATED TRUE)
 
     # Generate C source file embedding the hex content
-    set(EMBED_FILE_PATH "${XXD_EMBED_BINARY_DIR}/${FILE_KEY}.c")
+    set(EMBED_FILE_PATH "${XXD_EMBED_BINARY_DIR}/Generated/${FILE_KEY}.c")
     add_custom_command(
         OUTPUT ${EMBED_FILE_PATH}
         COMMAND ${CMAKE_COMMAND} -DCMAKE_CURRENT_INCLUDE_DIR=${CMAKE_CURRENT_INCLUDE_DIR} -DFILE_HEX=${FILE_HEX} -DFILE_KEY=${FILE_KEY} -DFILE_PATH=${FILE_PATH} -DEMBED_FILE_PATH=${EMBED_FILE_PATH} -P ${CMAKE_CURRENT_INCLUDE_DIR}/../cmake/EmbedFile.cmake

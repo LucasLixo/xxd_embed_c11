@@ -4,6 +4,26 @@ Embed resources into binary with CMake in a cross-platform way (Linux, Windows, 
 
 **Requires CMake 3.20 or higher** for native hex conversion support (no external dependencies).
 
+## Release Notes
+
+### Version 1.1.0 (Current)
+
+**Major Changes:**
+- **Removed external dependency**: No longer requires `xxd` utility to be installed or compiled as a build tool
+- **Universal CMake scripts**: Uses native CMake `file(READ HEX)` (available in CMake 3.20+) for hex conversion
+- **Optional executable**: Build option `XXD_BUILD_EXECUTABLE` (default ON) allows you to disable compilation of the xxd standalone executable
+- **Organized output**: Generated files now placed in `<binary-dir>/Generated/` subdirectory
+- **Improved compatibility**: Simplified Android/NDK cross-compilation by removing external tool requirements
+
+**Backward Compatibility:**
+- API and functionality remain unchanged — existing code continues to work
+- Default behavior (with `XXD_BUILD_EXECUTABLE=ON`) produces the same output as before
+- Only build requirement changed: CMake 3.5+ → CMake 3.20+
+
+### Version 1.0.0
+
+Original release with xxd executable dependency for hex conversion.
+
 ## Example
 
 1. Add this project to your CMake project as a submodule:
