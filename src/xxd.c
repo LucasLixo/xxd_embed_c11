@@ -1,61 +1,17 @@
 /* xxd: my hexdump facility. jw
  *
- *  2.10.90 changed to word output
- *  3.03.93 new indent style, dumb bug inserted and fixed.
- *          -c option, mls
- * 26.04.94 better option parser, -ps, -l, -s added.
- *  1.07.94 -r badly needs - as input file.  Per default autoskip over
- *             consequtive lines of zeroes, as unix od does.
- *          -a shows them too.
- *          -i dump as c-style #include "file.h"
- *  1.11.95 if "xxd -i" knows the filename, an 'unsigned char filename_bits[]'
- *          array is written in correct c-syntax.
- *          -s improved, now defaults to absolute seek, relative requires a '+'.
- *          -r improved, now -r -s -0x... is supported.
- *             change/suppress leading '\0' bytes.
- *          -l n improved: stops exactly after n bytes.
- *          -r improved, better handling of partial lines with trailing garbage.
- *          -r improved, now -r -p works again!
- *          -r improved, less flushing, much faster now! (that was silly)
- *  3.04.96 Per repeated request of a single person: autoskip defaults to off.
- * 15.05.96 -v added. They want to know the version.
- *          -a fixed, to show last line inf file ends in all zeros.
- *          -u added: Print upper case hex-letters, as preferred by unix bc.
- *          -h added to usage message. Usage message extended.
- *          Now using outfile if specified even in normal mode, aehem.
- *          No longer mixing of ints and longs. May help doze people.
- *          Added binify ioctl for same reason. (Enough Doze stress for 1996!)
- * 16.05.96 -p improved, removed occasional superfluous linefeed.
- * 20.05.96 -l 0 fixed. tried to read anyway.
- * 21.05.96 -i fixed. now honours -u, and prepends __ to numeric filenames.
- *          compile -DWIN32 for NT or W95. George V. Reilly, * -v improved :-)
- *          support --gnuish-longhorn-options
- * 25.05.96 MAC support added: CodeWarrior already uses ``outline'' in Types.h
- *          which is included by MacHeaders (Axel Kielhorn). Renamed to
- *          xxdline().
- *  7.06.96 -i printed 'int' instead of 'char'. *blush*
- *          added Bram's OS2 ifdefs...
- * 18.07.96 gcc -Wall @ SunOS4 is now slient.
- *          Added osver for MSDOS/DJGPP/WIN32.
- * 29.08.96 Added size_t to strncmp() for Amiga.
- * 24.03.97 Windows NT support (Phil Hanna). Clean exit for Amiga WB (Bram)
- * 02.04.97 Added -E option, to have EBCDIC translation instead of ASCII
- *          (antonio.colombo@jrc.org)
- * 22.05.97 added -g (group octets) option (jcook@namerica.kla.com).
- * 23.09.98 nasty -p -r misfeature fixed: slightly wrong output, when -c was
- *          missing or wrong.
- * 26.09.98 Fixed: 'xxd -i infile outfile' did not truncate outfile.
- * 27.10.98 Fixed: -g option parser required blank.
- *          option -b added: 01000101 binary output in normal format.
- *
  * (c) 1990-1998 by Juergen Weigert (jnweiger@informatik.uni-erlangen.de)
  *
  * Distribute freely and credit me,
  * make money and share with me,
  * lose money and don't ask me.
+ *
+ * See CHANGELOG.md for detailed version history.
  */
 #include <stdio.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <stddef.h>
 #ifdef __TSC__
 # define MSDOS
 #endif
@@ -99,19 +55,19 @@
 /* excerpt from my sun_stdlib.h */
 extern int fprintf __P((FILE *, char *, ...));
 extern int fputs   __P((char *, FILE *));
-extern int _flsbuf __P((unsigned char, FILE *));
+extern int _flsbuf __P((uint8_t, FILE *));
 extern int _filbuf __P((FILE *));
 extern int fflush  __P((FILE *));
 extern int fclose  __P((FILE *));
-extern int fseek   __P((FILE *, long, int));
+extern int fseek   __P((FILE *, int64_t, int));
 extern int rewind  __P((FILE *));
 
 extern void perror __P((char *));
 # endif
 #endif
 
-extern long int strtol();
-extern long int ftell();
+extern long strtol();
+extern long ftell();
 
 char version[] = "xxd V1.10 27oct98 by Juergen Weigert";
 #ifdef WIN32
@@ -166,8 +122,8 @@ char osver[] = "";
 /* Let's collect some prototypes */
 /* CodeWarrior is really picky about missing prototypes */
 static void exit_with_usage __P((char *));
-static int huntype __P((FILE *, FILE *, FILE *, char *, int, int, long));
-static void xxdline __P((FILE *, char *, int));
+static int32_t huntype __P((FILE *, FILE *, FILE *, char *, int32_t, int32_t, int64_t));
+static void xxdline __P((FILE *, char *, int32_t));
 
 #define TRY_SEEK 	/* attempt to use lseek, or skip forward by reading */
 #define COLS 256	/* change here, if you ever need more columns */
@@ -217,15 +173,15 @@ char *pname;
  *
  * The name is historic and came from 'undo type opt h'.
  */
-static int
+static int32_t
 huntype(fpi, fpo, fperr, pname, cols, hextype, base_off)
 FILE *fpi, *fpo, *fperr;
 char *pname;
-int cols, hextype;
-long base_off;
+int32_t cols, hextype;
+int64_t base_off;
 {
-  int c, ign_garb = 1, n1 = -1, n2 = 0, n3, p = cols;
-  long have_off = 0, want_off = 0;
+  int32_t c, ign_garb = 1, n1 = -1, n2 = 0, n3, p = cols;
+  int64_t have_off = 0, want_off = 0;
 
   rewind(fpi);
 
@@ -279,7 +235,7 @@ long base_off;
 	  if (base_off + want_off < have_off)
 	    {
 	      fprintf(fperr, "%s: sorry, cannot seek backwards.\n", pname);
-	      return 5;
+	      return (int32_t)5;
 	    }
 	  for (; have_off < base_off + want_off; have_off++)
 	    putc(0, fpo);
@@ -316,7 +272,7 @@ long base_off;
 #endif
   fclose(fpo);
   fclose(fpi);
-  return 0;
+  return (int32_t)0;
 }
 
 /*
@@ -335,10 +291,10 @@ static void
 xxdline(fp, l, nz)
 FILE *fp;
 char *l;
-int nz;
+int32_t nz;
 {
   static char z[LLEN+1];
-  static int zero_seen = 0;
+  static int32_t zero_seen = 0;
 
   if (!nz && zero_seen == 1)
     strcpy(z, l);
@@ -363,7 +319,7 @@ int nz;
 
 /* This is an EBCDIC to ASCII conversion table */
 /* from a proposed BTL standard April 16, 1979 */
-static unsigned char etoa64[] =
+static uint8_t etoa64[] =
 {
     0040,0240,0241,0242,0243,0244,0245,0246,
     0247,0250,0325,0056,0074,0050,0053,0174,
@@ -391,18 +347,18 @@ static unsigned char etoa64[] =
     0070,0071,0372,0373,0374,0375,0376,0377
 };
 
-int
+int32_t
 main(argc, argv)
-int argc;
+int32_t argc;
 char *argv[];
 {
   FILE *fp, *fpo;
-  int c, e, p = 0, relseek = 1, negseek = 0, revert = 0;
-  int cols = 0, nonzero = 0, autoskip = 0, hextype = HEX_NORMAL;
-  int ebcdic = 0;
-  int octspergrp = -1;	/* number of octets grouped in output */
-  int grplen;		/* total chars per octet group */
-  long length = -1, n = 0, seekoff = 0;
+  int32_t c, e, p = 0, relseek = 1, negseek = 0, revert = 0;
+  int32_t cols = 0, nonzero = 0, autoskip = 0, hextype = HEX_NORMAL;
+  int32_t ebcdic = 0;
+  int32_t octspergrp = -1;	/* number of octets grouped in output */
+  int32_t grplen;		/* total chars per octet group */
+  int64_t length = -1, n = 0, seekoff = 0;
   char l[LLEN+1];
   char *pname, *pp;
 
@@ -555,7 +511,7 @@ char *argv[];
 	{
 	  fprintf(stderr,"%s: ", pname);
 	  perror(argv[1]);
-	  return 2;
+	  return (int32_t)2;
 	}
     }
 
@@ -563,15 +519,15 @@ char *argv[];
     BIN_ASSIGN(fpo = stdout, revert);
   else
     {
-      int fd;
-      int mode = revert ? O_WRONLY : (O_TRUNC|O_WRONLY);
+      int32_t fd;
+      int32_t mode = revert ? O_WRONLY : (O_TRUNC|O_WRONLY);
 
       if (((fd = OPEN(argv[2], mode | BIN_CREAT(revert), 0666)) < 0) ||
           (fpo = fdopen(fd, BIN_WRITE(revert))) == NULL)
 	{
 	  fprintf(stderr, "%s: ", pname);
 	  perror(argv[2]);
-	  return 3;
+	  return (int32_t)3;
 	}
       rewind(fpo);
     }
@@ -581,7 +537,7 @@ char *argv[];
       if (hextype && (hextype != HEX_POSTSCRIPT))
         {
           fprintf(stderr, "%s: sorry, cannot revert this type of hexdump\n", pname);
-	  return -1;
+	  return (int32_t)-1;
 	}
       return huntype(fp, fpo, stderr, pname, cols, hextype,
       		negseek ? -seekoff : seekoff);
@@ -597,14 +553,14 @@ char *argv[];
       if (e < 0 && negseek)
         {
 	  fprintf(stderr, "%s: sorry cannot seek.\n", pname);
-	  return 4;
+	  return (int32_t)4;
 	}
       if (e >= 0)
         seekoff = ftell(fp);
       else
 #endif
-	{
-	  long s = seekoff;
+	 {
+	  int64_t s = seekoff;
 
 	  while (s--)
 	    getc(fp);
@@ -615,7 +571,7 @@ char *argv[];
     {
       if (fp != stdin)
 	{
-	  fprintf(fpo, "unsigned char %s", isdigit(argv[1][0]) ? "__" : "");
+	  fprintf(fpo, "uint8_t %s", isdigit(argv[1][0]) ? "__" : "");
 	  for (e = 0; (c = argv[1][e]) != 0; e++)
 	    putc(isalnum(c) ? c : '_', fpo);
 	  fputs("[] = {\n", fpo);
@@ -634,7 +590,7 @@ char *argv[];
 
       if (fp != stdin)
 	{
-	  fprintf(fpo, "unsigned int %s", isdigit(argv[1][0]) ? "__" : "");
+	  fprintf(fpo, "uint32_t %s", isdigit(argv[1][0]) ? "__" : "");
 	  for (e = 0; (c = argv[1][e]) != 0; e++)
 	    putc(isalnum(c) ? c : '_', fpo);
 	  fprintf(fpo, "_len = %d;\n", p);
@@ -687,7 +643,7 @@ char *argv[];
 	}
       else /* hextype == HEX_BITS */
         {
-	  int i;
+	  int32_t i;
 
 	  c = (9 + (grplen * p) / octspergrp) - 1;
 	  for (i = 7; i >= 0; i--)
@@ -717,5 +673,5 @@ char *argv[];
 
   fclose(fp);
   fclose(fpo);
-  return 0;
+  return (int32_t)0;
 }
