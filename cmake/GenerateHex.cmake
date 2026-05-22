@@ -21,7 +21,6 @@ set(OFFSET 0)
 while(OFFSET LESS HEX_LEN)
     # Get next 2 characters (1 byte in hex)
     string(SUBSTRING "${HEX_CONTENT}" ${OFFSET} 2 HEX_BYTE)
-    string(TOUPPER "${HEX_BYTE}" HEX_BYTE)
 
     # Add newline and indentation at start of each line
     if(BYTE_COUNT EQUAL 0)
