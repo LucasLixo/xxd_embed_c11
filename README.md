@@ -74,7 +74,8 @@ int main(int argc, char* argv[])
 Configure from the command line:
 
 ```
-cmake -B build -DXXD_BUILD_STATIC=ON -DXXD_BUILD_EXAMPLE=OFF
+cmake -S . -B build -DXXD_BUILD_STATIC=ON -DXXD_BUILD_EXAMPLE=OFF
+cmake --build build
 ```
 
 ### CMake Policy CMP0118
