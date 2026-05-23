@@ -1,5 +1,9 @@
 # Embed resources into binary with XXD and CMake
 
+[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
+[![CMake](https://img.shields.io/badge/CMake-3.20%2B-blue.svg)](https://cmake.org)
+[![C Standard](https://img.shields.io/badge/C-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
+
 Embed resources into binary with CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
 
 **Requires CMake 3.20 or higher** for native hex conversion support (no external dependencies).
