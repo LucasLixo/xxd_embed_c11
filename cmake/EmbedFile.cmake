@@ -12,6 +12,8 @@ find_program(XDG_MIME xdg-mime)
 if (XDG_MIME)
     # Query MIME type using xdg-mime command
     execute_process(COMMAND ${XDG_MIME} query filetype ${FILE_PATH} OUTPUT_VARIABLE FILE_MIME)
+    # Strip trailing whitespace (newline) from output
+    string(STRIP "${FILE_MIME}" FILE_MIME)
 else()
     set(FILE_MIME "unsupported")
 endif()
