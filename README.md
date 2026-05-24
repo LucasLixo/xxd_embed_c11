@@ -1,32 +1,34 @@
 # Embed resources into binary with XXD and CMake
 
 [![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](http://unlicense.org/)
-[![CMake](https://img.shields.io/badge/CMake-3.20%2B-blue.svg)](https://cmake.org)
+[![CMake](https://img.shields.io/badge/CMake-3.24%2B-blue.svg)](https://cmake.org)
 [![C Standard](https://img.shields.io/badge/C-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
 
 Embed resources into binary with CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
 
-**Requires CMake 3.20 or higher** for native hex conversion support (no external dependencies).
+**Requires CMake 3.24 or higher.**
 
 ## Release Notes
 
-### Version 1.1.0 (Current)
+### Version 2.0.0 (Current)
 
-**Major Changes:**
-- **Removed external dependency**: No longer requires `xxd` utility to be installed or compiled as a build tool
-- **Universal CMake scripts**: Uses native CMake `file(READ HEX)` (available in CMake 3.20+) for hex conversion
-- **Optional executable**: Build option `XXD_BUILD_EXECUTABLE` (default ON) allows you to disable compilation of the xxd standalone executable
-- **Organized output**: Generated files now placed in `<binary-dir>/Generated/` subdirectory
-- **Improved compatibility**: Simplified Android/NDK cross-compilation by removing external tool requirements
+**Major changes (breaking):**
+- **New `xxd_embed()` function** — replaces the old positional macro with named arguments (`FILE_KEY`, `FILE_PATH`, `MIME`, `TARGETS`). `MIME` is now required and supplied by the caller.
+- **Automatic per-directory resource library** — generated translation units are bundled into a deferred static library (`xxd_resources_<hash>`) and linked into the listed `TARGETS` via `WHOLE_ARCHIVE`. No more `set(SRCS ...)` plumbing in the caller.
+- **Assembly-based embedding (`.incbin`)** — on GCC/Clang, files are embedded via inline `__asm__(".incbin ...")` instead of generated hex arrays. Compile time drops by orders of magnitude for large files because the assembler streams the bytes verbatim.
+- **`xxd -I` flag** — new `-I` flag emits raw hex bytes (12 per line) without the surrounding C array declaration; the output is bit-identical to `cmake/GenerateHex.cmake`. When the `xxd` target is available, the hex path uses the executable for speed.
+- **`XXD_EMBED_ASM` option** — choose the embedding strategy: `AUTO` (compiler-detected, default), `ON` (force `.incbin`), `OFF` (force hex array).
+- **Removed `xdg-mime` auto-detection** — MIME type was unreliable across platforms; now the caller passes it explicitly.
 
-**Backward Compatibility:**
-- API and functionality remain unchanged — existing code continues to work
-- Default behavior (with `XXD_BUILD_EXECUTABLE=ON`) produces the same output as before
-- Only build requirement changed: CMake 3.5+ → CMake 3.20+
+**Minimum CMake bumped: 3.20 → 3.24** (required for `$<LINK_LIBRARY:WHOLE_ARCHIVE,...>`).
+
+### Version 1.1.0
+
+Removed the external `xxd` dependency by switching hex conversion to native CMake `file(READ ... HEX)`. CMake 3.20+ required.
 
 ### Version 1.0.0
 
-Original release with xxd executable dependency for hex conversion.
+Original release with `xxd` executable dependency for hex conversion.
 
 ## Example
 
@@ -42,15 +44,26 @@ git submodule add https://github.com/LucasLixo/xxd_embed_c11.git some/path/xxd
 add_subdirectory(some/path/xxd)
 ```
 
-3. Embed resource files using the `xxd_embed` macro:
+3. Embed resource files using the `xxd_embed` function:
 
 ```cmake
-set(SRCS "main.c")
-xxd_embed("text" "${CMAKE_CURRENT_SOURCE_DIR}/text.txt" SRCS)
-xxd_embed("rect" "${CMAKE_CURRENT_SOURCE_DIR}/rect.svg" SRCS)
+add_executable(xxd_example main.c)
 
-add_executable(xxd_example ${SRCS})
-target_link_libraries(xxd_example xxd::xxd)
+xxd_embed(
+    FILE_KEY  "text"
+    FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/text.txt"
+    MIME      "text/plain"
+    TARGETS   xxd_example
+)
+xxd_embed(
+    FILE_KEY  "rect"
+    FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/rect.svg"
+    MIME      "image/svg+xml"
+    TARGETS   xxd_example
+)
+# A per-directory static lib xxd_resources_<hash> is created at the end of
+# configuration and linked into every listed target. xxd::xxd is propagated
+# transitively, so no manual target_link_libraries call is needed.
 ```
 
 4. Access the embedded resources in your C code:
@@ -71,15 +84,22 @@ int main(int argc, char* argv[])
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `XXD_BUILD_EXECUTABLE` | `ON` | Build the `xxd` standalone executable. Set to `OFF` to disable (binary resources will still embed correctly via CMake scripts). |
+| `XXD_BUILD_EXECUTABLE` | `ON` | Build the `xxd` standalone executable. Set to `OFF` to disable (resource embedding still works). |
 | `XXD_BUILD_STATIC` | `ON` | Build `libxxd` as a static library. Set to `OFF` to build as a shared library (`.dll`/`.so`). |
 | `XXD_BUILD_EXAMPLE` | `ON` | Build the bundled example executable. |
+| `XXD_EMBED_ASM` | `AUTO` | Embedding strategy: `AUTO` (MSVC → hex array, GCC/Clang → `.incbin`), `ON` (force `.incbin`), `OFF` (force hex array). |
 
 Configure from the command line:
 
 ```
 cmake -S . -B build -DXXD_BUILD_STATIC=ON -DXXD_BUILD_EXAMPLE=OFF
 cmake --build build
+```
+
+Force the slower-but-portable hex path on a GCC/Clang toolchain:
+
+```
+cmake -S . -B build -DXXD_EMBED_ASM=OFF
 ```
 
 ### CMake Policy CMP0118
@@ -102,17 +122,31 @@ endif()
 
 Note: `CMAKE_POLICY_DEFAULT_CMP0118` survives subdirectory `cmake_minimum_required` resets, which would otherwise unset CMP0118 (introduced in CMake 3.20).
 
-## CMake macro
+## CMake function
 
 ```cmake
-xxd_embed(<key> <file_path> <sources_list>)
+xxd_embed(
+    FILE_KEY  <key>
+    FILE_PATH <absolute_path>
+    MIME      <mime_type>
+    TARGETS   <target1> [<target2> ...]
+)
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `key` | Name used to retrieve the resource at runtime via `xxd_get`. |
-| `file_path` | Absolute path to the file to embed. |
-| `sources_list` | CMake list variable to append the generated `.c` file to. |
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `FILE_KEY` | yes | Name used to retrieve the resource at runtime via `xxd_get`. |
+| `FILE_PATH` | yes | Absolute path to the file to embed. |
+| `MIME` | yes | MIME type string returned by `xxd_get` via its `mime` out-parameter. |
+| `TARGETS` | yes | One or more targets that will receive the embedded resource at link time. |
+
+Calls are accumulated per source directory; at the end of configuration a single `xxd_resources_<hash>` static library is created from all embed sources and linked into every listed target (using `WHOLE_ARCHIVE` so global constructors are not dropped).
+
+### Choosing the embedding strategy
+
+`AUTO` (default) selects `.incbin` for GCC/Clang and the hex-array path for MSVC. The `.incbin` path is dramatically faster to compile for large files because the assembler copies the bytes directly instead of parsing thousands of hex literals.
+
+Override with `XXD_EMBED_ASM=ON` or `OFF` when cross-compiling or when the auto-detection does not match the toolchain.
 
 ## Preprocessor macros
 
@@ -123,7 +157,7 @@ These macros control the visibility of the public API symbols when including `xx
 | `XXD_STATIC` | When linking against the static library | Disables `__declspec(dllimport/dllexport)` on Windows. Automatically defined by CMake when `XXD_BUILD_STATIC=ON`. |
 | `XXD_EXPORTS` | When building `libxxd` itself as a shared library | Marks API symbols as `__declspec(dllexport)`. Defined automatically by the build system; not needed by consumers. |
 
-When using CMake and `target_link_libraries(my_app xxd::xxd)`, these macros are set automatically — no manual definition is required.
+When using CMake and `xxd_embed(... TARGETS my_app)`, these macros are set automatically — no manual definition is required.
 
 ## API
 
@@ -139,11 +173,19 @@ const char* xxd_get(const char* name, size_t* size, const char** mime);
 
 `xxd_add` is called automatically at program startup for every file embedded via `xxd_embed` — user code only needs to call `xxd_get`.
 
+## `xxd` command-line flags
+
+In addition to the standard `xxd` flags, this build adds:
+
+| Flag | Description |
+|------|-------------|
+| `-I` | Embed-only: emit hex bytes (12 per line) without the surrounding C array declaration. Output is bit-identical to `cmake/GenerateHex.cmake`. |
+
 ## Platform notes
 
 ### Android (NDK cross-compilation)
 
-Since version 1.1.0, this project uses native CMake hex conversion (no external tools needed). Resource embedding works automatically on all platforms including Android.
+Resource embedding works automatically on all platforms including Android. On the NDK (GCC/Clang) the `.incbin` path is used by default.
 
 #### Step 1 — Install the NDK
 

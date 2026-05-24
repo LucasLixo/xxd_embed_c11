@@ -5,14 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2026-05-23
 
-### Added - 2026-05-19
+This release modernizes the CMake API and adds an assembly-based embedding path that drops compile time by orders of magnitude for large files. The old positional `xxd_embed` macro is replaced by a named-argument function; the resulting source files are bundled into a per-directory static library that is linked automatically into the listed targets.
+
+### Added
+
+- **`xxd_embed()` function** with named arguments (`FILE_KEY`, `FILE_PATH`, `MIME`, `TARGETS`). All arguments are required; missing ones produce a `FATAL_ERROR` at configure time.
+- **Per-directory resource library**: every `xxd_embed` call in a directory accumulates into a single `xxd_resources_<hash>` static library, created via `cmake_language(DEFER)` and linked into each listed target with `$<LINK_LIBRARY:WHOLE_ARCHIVE,...>` so global constructors are preserved. `xxd::xxd` is propagated transitively — consumers no longer need to call `target_link_libraries` manually.
+- **`.incbin` embedding path** (`cmake/GenerateEmbed.cmake` + `include/xxd_gas.c.in`): on GCC/Clang the embedded payload is emitted via inline `__asm__(".incbin ...")` instead of a hex array, so the assembler streams the bytes directly without parsing literals. Targets macOS (`__TEXT,__const`), Windows COFF (`.rdata`), and ELF (`.rodata`).
+- **`XXD_EMBED_ASM` cache option** to override embedding strategy: `AUTO` (default — `.incbin` on GCC/Clang, hex array on MSVC), `ON` (force `.incbin`), `OFF` (force hex array).
+- **`xxd -I` flag**: embed-only output that emits hex bytes (12 per line) without the surrounding C array declaration. Output is bit-identical to `cmake/GenerateHex.cmake`, so the two are interchangeable; the executable is preferred when available because it is faster on large files.
+- New file `cmake/GenerateEmbed.cmake` and template `include/xxd_gas.c.in`.
+
+### Changed
+
+- **Minimum CMake bumped to 3.24** (previously 3.20) — required for `$<LINK_LIBRARY:WHOLE_ARCHIVE,...>`.
+- **`cmake/GenerateHex.cmake`** now emits multi-line output (12 bytes per line) matching `xxd -I` exactly, including the trailing newline.
+- **`cmake/EmbedFile.cmake`** no longer detects MIME via `xdg-mime`; the value is supplied by the caller via `-DFILE_MIME=...`.
+- **`include/xxd.in` renamed to `include/xxd.c.in`** so the `.c.in` suffix matches the new gas template (`include/xxd_gas.c.in`). Content is otherwise unchanged.
+- **Optimization flag for the hex path** is now compiler-aware: `/Od` on MSVC, `-O0` elsewhere. Previously hardcoded `/Od` would break a forced hex build on GCC/Clang.
+- Project version bumped to `2.0.0`.
+
+### Removed
+
+- The old positional `macro(xxd_embed FILE_KEY FILE_PATH SOURCES)`. Callers must migrate to the new function — see README.md.
+- Automatic MIME detection via `xdg-mime` (unreliable across platforms, missing on Windows).
+
+### Migration from 1.x
+
+Before:
+```cmake
+set(SRCS "main.c")
+xxd_embed("text" "${CMAKE_CURRENT_SOURCE_DIR}/text.txt" SRCS)
+add_executable(my_app ${SRCS})
+target_link_libraries(my_app xxd::xxd)
+```
+
+After:
+```cmake
+add_executable(my_app main.c)
+xxd_embed(
+    FILE_KEY  "text"
+    FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/text.txt"
+    MIME      "text/plain"
+    TARGETS   my_app
+)
+```
+
+The static resource library and `xxd::xxd` are linked automatically.
+
+## [1.1.1] - 2026-05-19
+
+### Added
 
 - Support for fixed-width integer types from `stdint.h` throughout the codebase
 - Explicit `#include <stdint.h>` in all source files for type safety and portability
 
-### Changed - 2026-05-19
+### Changed
 
 - **Type System Migration**: Migrated entire codebase to use fixed-width integer types:
   - `int` → `int32_t` for variables and function parameters
@@ -77,6 +127,7 @@ The following is the historical changelog from the original xxd utility:
 - **26.09.98**: Fixed `-i` output truncation
 - **27.10.98**: Fixed `-g` option parser. Added `-b` option for binary output
 
-[Unreleased]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.0...HEAD
+[2.0.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.1...2.0.0
+[1.1.1]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/LucasLixo/xxd_embed_c11/releases/tag/1.0.0
