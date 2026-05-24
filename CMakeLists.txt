@@ -100,9 +100,16 @@ function(_xxd_create_resource_lib)
     # Wrap in WHOLE_ARCHIVE so the linker keeps translation units whose only
     # exports are global constructors registering resources at startup.
     foreach(_target IN LISTS _targets)
-        target_link_libraries(${_target} PRIVATE
-            "$<LINK_LIBRARY:WHOLE_ARCHIVE,${_lib_name}>")
-        add_dependencies(${_target} ${_lib_name})
+        get_target_property(_type ${_target} TYPE)
+        if(_type STREQUAL "INTERFACE_LIBRARY")
+            # INTERFACE libraries propagate the resource lib to downstream consumers.
+            target_link_libraries(${_target} INTERFACE
+                "$<LINK_LIBRARY:WHOLE_ARCHIVE,${_lib_name}>")
+        else()
+            target_link_libraries(${_target} PRIVATE
+                "$<LINK_LIBRARY:WHOLE_ARCHIVE,${_lib_name}>")
+            add_dependencies(${_target} ${_lib_name})
+        endif()
     endforeach()
 endfunction()
 
