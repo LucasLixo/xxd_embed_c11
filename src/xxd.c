@@ -151,6 +151,7 @@ char *pname;
   fprintf(stderr, "    -g          number of octets per group in normal output. Default 2.\n");
   fprintf(stderr, "    -h          print this summary.\n");
   fprintf(stderr, "    -i          output in C include file style.\n");
+  fprintf(stderr, "    -I          embed-only: output hex bytes without C array declaration.\n");
   fprintf(stderr, "    -l len      stop after <len> octets.\n");
   fprintf(stderr, "    -ps         output in postscript plain hexdump style.\n");
   fprintf(stderr, "    -r          reverse operation: convert (or patch) hexdump into binary.\n");
@@ -356,6 +357,7 @@ char *argv[];
   int32_t c, e, p = 0, relseek = 1, negseek = 0, revert = 0;
   int32_t cols = 0, nonzero = 0, autoskip = 0, hextype = HEX_NORMAL;
   int32_t ebcdic = 0;
+  int32_t embed_only = 0;	/* -I: suppress array declaration in -i mode */
   int32_t octspergrp = -1;	/* number of octets grouped in output */
   int32_t grplen;		/* total chars per octet group */
   int64_t length = -1, n = 0, seekoff = 0;
@@ -381,6 +383,7 @@ char *argv[];
       else if (!STRNCMP(pp, "-u", 2)) hexx = hexxa + 16;
       else if (!STRNCMP(pp, "-p", 2)) hextype = HEX_POSTSCRIPT;
       else if (!STRNCMP(pp, "-i", 2)) hextype = HEX_CINCLUDE;
+      else if (!STRNCMP(pp, "-I", 2)) { hextype = HEX_CINCLUDE; embed_only = 1; }
       else if (!STRNCMP(pp, "-r", 2)) revert++;
       else if (!STRNCMP(pp, "-E", 2)) ebcdic++;
       else if (!STRNCMP(pp, "-v", 2))
@@ -569,7 +572,7 @@ char *argv[];
 
   if (hextype == HEX_CINCLUDE)
     {
-      if (fp != stdin)
+      if (fp != stdin && !embed_only)
 	{
 	  fprintf(fpo, "uint8_t %s", isdigit(argv[1][0]) ? "__" : "");
 	  for (e = 0; (c = argv[1][e]) != 0; e++)
@@ -586,9 +589,9 @@ char *argv[];
 	}
 
       if (p)
-        fputs("\n};\n"+3*(fp == stdin), fpo);
+        fputs("\n};\n"+3*(fp == stdin || embed_only), fpo);
 
-      if (fp != stdin)
+      if (fp != stdin && !embed_only)
 	{
 	  fprintf(fpo, "uint32_t %s", isdigit(argv[1][0]) ? "__" : "");
 	  for (e = 0; (c = argv[1][e]) != 0; e++)
