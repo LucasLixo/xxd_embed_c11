@@ -1,12 +1,15 @@
-# Initialize source file list
-set(SRCS "example.c")
+add_executable(xxd_example example.c)
 
-# Embed resource file into C source
-xxd_embed("text" "${CMAKE_CURRENT_SOURCE_DIR}/text.txt" SRCS)
-xxd_embed("rect" "${CMAKE_CURRENT_SOURCE_DIR}/rect.svg" SRCS)
-
-# Build example executable
-add_executable(xxd_example ${SRCS})
-
-# Link against xxd library
-target_link_libraries(xxd_example xxd::xxd)
+xxd_embed(
+    FILE_KEY "text"
+    FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/text.txt"
+    MIME "text/plain"
+    TARGETS xxd_example
+)
+xxd_embed(
+    FILE_KEY "rect"
+    FILE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/rect.svg"
+    MIME "image/svg+xml"
+    TARGETS xxd_example
+)
+# xxd_resources_<hash> static lib and xxd::xxd are linked automatically via cmake_language(DEFER).
