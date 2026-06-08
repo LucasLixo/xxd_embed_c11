@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-06-08
+
+This release adds first-class WebAssembly support via Emscripten. Resources are embedded using Emscripten's native `--embed-file` mechanism instead of C arrays or assembly, and the public API (`xxd_get` / `xxd_add`) is exported to JavaScript automatically.
+
+### Added
+
+- **WebAssembly (Emscripten) embedding strategy** (`include/xxd_wasm.c.in` + `cmake/GenerateWasmEmbed.cmake`): when the Emscripten toolchain is detected, each resource is passed to `emcc` via `--embed-file path@/xxd/<key>`. A constructor-based C file opens the virtual-FS path at startup (`fopen("/xxd/<key>", "rb")`), reads the bytes into a `malloc` buffer, and calls `xxd_add()`. The existing `xxd_get` API is unchanged.
+- **`EMSCRIPTEN_KEEPALIVE` on public API**: `xxd_get` and `xxd_add` are annotated in `xxd.h` so they survive dead-code elimination and are accessible from JavaScript via `Module.ccall` / `Module.cwrap`.
+- **`--embed-file` link options applied automatically**: the `_xxd_create_resource_lib()` finalizer accumulates the correct `--embed-file path@/xxd/<key>` flags and applies them to each final target via `target_link_options()`.
+- **`#error` guard in `xxd_gas.c.in`**: a compile-time error fires if the `.incbin` template is ever reached under `__EMSCRIPTEN__`, preventing a silent miscompile.
+
+### Changed
+
+- **`XXD_BUILD_EXECUTABLE` skipped for Emscripten**: the `xxd` standalone tool is not built when `EMSCRIPTEN` is set — a WASM binary cannot run on the host as a build tool. Hex generation falls back to `GenerateHex.cmake` automatically.
+- **`XXD_EMBED_ASM` AUTO now treats Emscripten like MSVC**: forces the hex-array path (immediately overridden to the WASM strategy internally). `XXD_EMBED_ASM=ON` is rejected with a `FATAL_ERROR` when Emscripten is active.
+- **`include/xxd.h` platform guards reordered**: `__EMSCRIPTEN__` is checked before `_WIN32` so the WASM branch takes precedence on all Emscripten toolchains.
+- **`libxxd` source list updated** to include `include/xxd_wasm.c.in` and `cmake/GenerateWasmEmbed.cmake` (visible in IDE project trees).
+- Project version bumped to `3.0.0`.
+
 ## [2.0.0] - 2026-05-23
 
 This release modernizes the CMake API and adds an assembly-based embedding path that drops compile time by orders of magnitude for large files. The old positional `xxd_embed` macro is replaced by a named-argument function; the resulting source files are bundled into a per-directory static library that is linked automatically into the listed targets.
@@ -127,6 +146,7 @@ The following is the historical changelog from the original xxd utility:
 - **26.09.98**: Fixed `-i` output truncation
 - **27.10.98**: Fixed `-g` option parser. Added `-b` option for binary output
 
+[3.0.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/2.0.0...3.0.0
 [2.0.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.1...2.0.0
 [1.1.1]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.0.0...1.1.0

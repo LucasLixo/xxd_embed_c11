@@ -10,7 +10,7 @@ if(POLICY CMP0118)
 endif()
 
 # Project definition
-project(xxd VERSION 2.0.0 LANGUAGES C)
+project(xxd VERSION 3.0.0 LANGUAGES C)
 
 # Options to build
 option(XXD_BUILD_EXECUTABLE "Build xxd as standalone executable" ON)
