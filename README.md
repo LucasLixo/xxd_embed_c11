@@ -10,7 +10,13 @@ Embed resources into binary with CMake in a cross-platform way (Linux, Windows, 
 
 ## Release Notes
 
-### Version 2.0.0 (Current)
+### Version 3.0.0 (Current)
+
+- **WebAssembly (Emscripten) support** — `xxd_embed` detects Emscripten and switches to a dedicated WASM strategy: files are bundled via `--embed-file` and read from Emscripten's virtual FS at startup via `fopen`. No hex arrays, no `.incbin`. `xxd_get` and `xxd_add` are exported to JavaScript via `EMSCRIPTEN_KEEPALIVE`.
+- **`xxd` executable skipped for Emscripten** — the standalone tool is not built when cross-compiling to WASM (a WASM binary cannot serve as a host build tool).
+- **`XXD_EMBED_ASM=ON` rejected for Emscripten** — produces a `FATAL_ERROR` at configure time with a clear message.
+
+### Version 2.0.0
 
 **Major changes (breaking):**
 - **New `xxd_embed()` function** — replaces the old positional macro with named arguments (`FILE_KEY`, `FILE_PATH`, `MIME`, `TARGETS`). `MIME` is now required and supplied by the caller.
