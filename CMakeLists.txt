@@ -18,7 +18,7 @@ option(XXD_BUILD_STATIC "Build static library" ON)
 option(XXD_BUILD_EXAMPLE "Build example executable" ON)
 
 # Controls the binary embedding strategy used by xxd_embed().
-# AUTO: detect from compiler (MSVC -> hex array, GCC/Clang -> .incbin)
+# AUTO: detect from compiler (MSVC or Emscripten -> hex array, GCC/Clang -> .incbin)
 # ON:   force .incbin via inline __asm__ (GCC/Clang assembler required)
 # OFF:  force hex array in C (works with any C compiler, slower for large files)
 set(XXD_EMBED_ASM "AUTO" CACHE STRING "Embedding strategy: AUTO (detect by compiler), ON (force .incbin), OFF (force hex array)")
@@ -29,7 +29,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Build xxd executable (optional - not required for embedding functionality)
-if(XXD_BUILD_EXECUTABLE)
+if(XXD_BUILD_EXECUTABLE AND NOT EMSCRIPTEN)
     add_executable(xxd ${CMAKE_CURRENT_SOURCE_DIR}/src/xxd.c)
     set_property(TARGET xxd PROPERTY C_STANDARD 11)
 endif()
@@ -47,8 +47,10 @@ target_sources(libxxd PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd.c.in
     ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd_gas.c.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/xxd_wasm.c.in
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedFile.cmake
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateEmbed.cmake)
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateEmbed.cmake
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateWasmEmbed.cmake)
 
 # Propagate XXD_STATIC so consumers skip dllimport decorators
 if(${XXD_BUILD_STATIC})
@@ -111,6 +113,18 @@ function(_xxd_create_resource_lib)
             add_dependencies(${_target} ${_lib_name})
         endif()
     endforeach()
+
+    # For Emscripten: apply accumulated --embed-file flags so emcc bundles raw files
+    # into the JS/WASM output, making them accessible via the virtual FS at runtime.
+    if(EMSCRIPTEN)
+        foreach(_target IN LISTS _targets)
+            get_property(_embed_files DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                PROPERTY "_XXD_EMBED_FILES_${_target}")
+            foreach(_ef IN LISTS _embed_files)
+                target_link_options(${_target} PRIVATE "SHELL:--embed-file ${_ef}")
+            endforeach()
+        endforeach()
+    endif()
 endfunction()
 
 # Function: Embed a binary file into the consuming targets as a registered resource.
@@ -136,12 +150,15 @@ function(xxd_embed)
 
     # Resolve embedding strategy.
     if(XXD_EMBED_ASM STREQUAL "AUTO")
-        if(MSVC)
+        if(MSVC OR EMSCRIPTEN)
             set(_use_asm FALSE)
         else()
             set(_use_asm TRUE)
         endif()
     elseif(XXD_EMBED_ASM STREQUAL "ON")
+        if(EMSCRIPTEN)
+            message(FATAL_ERROR "xxd_embed: XXD_EMBED_ASM=ON is not supported with Emscripten (wasm-ld has no .incbin). Use AUTO or OFF.")
+        endif()
         set(_use_asm TRUE)
     else()
         set(_use_asm FALSE)
@@ -150,7 +167,32 @@ function(xxd_embed)
     file(MAKE_DIRECTORY "${XXD_EMBED_BINARY_DIR}/Generated")
     set(_embed_c "${XXD_EMBED_BINARY_DIR}/Generated/${ARG_FILE_KEY}.c")
 
-    if(NOT _use_asm)
+    if(EMSCRIPTEN AND NOT _use_asm)
+        # Emscripten path: embed via --embed-file linker flag + fopen at startup.
+        # No hex conversion needed; the raw file is bundled by emcc into the JS output.
+        add_custom_command(
+            OUTPUT "${_embed_c}"
+            COMMAND ${CMAKE_COMMAND}
+                "-DCMAKE_CURRENT_INCLUDE_DIR=${CMAKE_CURRENT_INCLUDE_DIR}"
+                "-DFILE_KEY=${ARG_FILE_KEY}"
+                "-DFILE_MIME=${ARG_MIME}"
+                "-DEMBED_FILE_PATH=${_embed_c}"
+                -P "${CMAKE_CURRENT_INCLUDE_DIR}/../cmake/GenerateWasmEmbed.cmake"
+            COMMENT "Embedding ${ARG_FILE_KEY} via --embed-file"
+            DEPENDS "${ARG_FILE_PATH}" "${CMAKE_CURRENT_INCLUDE_DIR}/xxd_wasm.c.in"
+            VERBATIM)
+        set_source_files_properties("${_embed_c}" PROPERTIES
+            GENERATED TRUE
+            COMPILE_FLAGS "-O0")
+
+        # Accumulate --embed-file flags per target; applied at link time by the finalizer.
+        foreach(_t IN LISTS ARG_TARGETS)
+            set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                APPEND PROPERTY "_XXD_EMBED_FILES_${_t}"
+                "${ARG_FILE_PATH}@/xxd/${ARG_FILE_KEY}")
+        endforeach()
+
+    elseif(NOT _use_asm)
         # Hex array path: compatible with MSVC and any C compiler.
         set(_hex_file "${XXD_EMBED_BINARY_DIR}/Generated/${ARG_FILE_KEY}.hex")
 
