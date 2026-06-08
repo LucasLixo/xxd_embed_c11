@@ -1,7 +1,11 @@
 #ifndef XXD_H
 #define XXD_H
 
-#ifdef _WIN32
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#  define XXD_CALL
+#  define XXD_EMBED_API EMSCRIPTEN_KEEPALIVE
+#elif defined(_WIN32)
 #  define XXD_CALL __cdecl
 #  ifdef XXD_STATIC
 #    define XXD_EMBED_API

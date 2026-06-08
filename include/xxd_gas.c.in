@@ -31,6 +31,8 @@ __asm__(
 );
 extern const uint8_t xxd_data_@FILE_KEY_HASH@[];
 extern const uint8_t xxd_data_end_@FILE_KEY_HASH@[];
+#elif defined(__EMSCRIPTEN__)
+#  error ".incbin is not supported by the Emscripten WASM backend. Set XXD_EMBED_ASM=AUTO or OFF."
 #else
 /* Linux, Android NDK (ARM/ARM64/x86/RISC-V/MIPS), FreeBSD: ELF read-only data. */
 __asm__(
