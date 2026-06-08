@@ -4,7 +4,7 @@
 [![CMake](https://img.shields.io/badge/CMake-3.24%2B-blue.svg)](https://cmake.org)
 [![C Standard](https://img.shields.io/badge/C-C11-blue.svg)](https://en.wikipedia.org/wiki/C11_(C_standard_revision))
 
-Embed resources into binary with CMake in a cross-platform way (Linux, Windows, macOS and [Android](#platform-notes) support).
+Embed resources into binary with CMake in a cross-platform way (Linux, Windows, macOS, [Android](#android-ndk-cross-compilation) and [WebAssembly](#webassembly-emscripten) support).
 
 **Requires CMake 3.24 or higher.**
 
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
 | `XXD_BUILD_EXECUTABLE` | `ON` | Build the `xxd` standalone executable. Set to `OFF` to disable (resource embedding still works). |
 | `XXD_BUILD_STATIC` | `ON` | Build `libxxd` as a static library. Set to `OFF` to build as a shared library (`.dll`/`.so`). |
 | `XXD_BUILD_EXAMPLE` | `ON` | Build the bundled example executable. |
-| `XXD_EMBED_ASM` | `AUTO` | Embedding strategy: `AUTO` (MSVC → hex array, GCC/Clang → `.incbin`), `ON` (force `.incbin`), `OFF` (force hex array). |
+| `XXD_EMBED_ASM` | `AUTO` | Embedding strategy: `AUTO` (MSVC or Emscripten → hex array, GCC/Clang → `.incbin`), `ON` (force `.incbin`), `OFF` (force hex array). |
 
 Configure from the command line:
 
@@ -144,7 +144,7 @@ Calls are accumulated per source directory; at the end of configuration a single
 
 ### Choosing the embedding strategy
 
-`AUTO` (default) selects `.incbin` for GCC/Clang and the hex-array path for MSVC. The `.incbin` path is dramatically faster to compile for large files because the assembler copies the bytes directly instead of parsing thousands of hex literals.
+`AUTO` (default) selects `.incbin` for GCC/Clang and the hex-array path for MSVC and Emscripten. The `.incbin` path is dramatically faster to compile for large files because the assembler copies the bytes directly instead of parsing thousands of hex literals. Emscripten uses `--embed-file` instead of any C array, so `XXD_EMBED_ASM=ON` is rejected with a fatal error.
 
 Override with `XXD_EMBED_ASM=ON` or `OFF` when cross-compiling or when the auto-detection does not match the toolchain.
 
@@ -256,6 +256,105 @@ Expected output includes `Machine: AArch64` and `Type: REL (Relocatable file)`.
 | `x86_64` | 64-bit x86 — emulator |
 
 `XXD_BUILD_STATIC=ON` is the default and required for Android — it produces `libxxd.a` that links cleanly into your APK via the NDK.
+
+### WebAssembly (Emscripten)
+
+When the Emscripten toolchain is detected, `xxd_embed` switches to a dedicated WASM strategy instead of hex arrays or `.incbin`:
+
+1. **`--embed-file`** — each resource file is passed to `emcc` as `--embed-file path@/xxd/<key>`. Emscripten bundles the raw bytes directly into the JS/WASM output and exposes them through its virtual file system.
+2. **FS constructor** — a small generated C file opens `/xxd/<key>` at program startup (via `fopen`), reads the bytes into a `malloc` buffer, and calls `xxd_add()`. The public `xxd_get()` API is unchanged.
+3. **`EMSCRIPTEN_KEEPALIVE`** — `xxd_get` and `xxd_add` are marked with `EMSCRIPTEN_KEEPALIVE` so they survive dead-code elimination and are accessible from JavaScript via `Module.ccall` / `Module.cwrap`.
+
+The `xxd` standalone executable is not built when Emscripten is the compiler (it would produce an unusable WASM binary); hex generation falls back to the pure-CMake `GenerateHex.cmake` script automatically.
+
+#### Step 1 — Install the Emscripten SDK
+
+```bash
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+```
+
+On Windows (PowerShell):
+
+```powershell
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+.\emsdk.ps1 install latest
+.\emsdk.ps1 activate latest
+. .\emsdk_env.ps1
+```
+
+#### Step 2 — Configure for WebAssembly
+
+**Linux / macOS:**
+```bash
+emcmake cmake -S . -B build_wasm \
+    -DXXD_BUILD_EXAMPLE=ON \
+    -DCMAKE_BUILD_TYPE=Release
+```
+
+**Windows (PowerShell):**
+```powershell
+# Activate emsdk first if not done in the current shell
+. C:\path\to\emsdk\emsdk_env.ps1
+
+emcmake cmake -S . -B build_wasm `
+    -DXXD_BUILD_EXAMPLE=ON `
+    -DCMAKE_BUILD_TYPE=Release
+```
+
+#### Step 3 — Build
+
+```
+cmake --build build_wasm
+```
+
+#### Step 4 — Run
+
+The output is `build_wasm/example/xxd_example.js` alongside `xxd_example.wasm`. Run it with Node.js (bundled with emsdk) or serve it from a web page:
+
+```bash
+# Linux / macOS — Node.js from PATH
+node build_wasm/example/xxd_example.js
+
+# Windows — Node.js bundled with emsdk
+C:\path\to\emsdk\node\22.16.0_64bit\bin\node.exe build_wasm\example\xxd_example.js
+```
+
+Expected output:
+
+```
+text.txt
+    Mime: text/plain
+    Size: 13
+    Content: Hello, world!
+rect.svg
+    Mime: image/svg+xml
+    Size: 145
+    Content: <svg ...>
+```
+
+#### Step 5 — Call from JavaScript
+
+Because `xxd_get` and `xxd_add` are exported via `EMSCRIPTEN_KEEPALIVE`, you can call them directly from JavaScript once the WASM module is ready:
+
+```js
+// Wait for the Emscripten runtime to be ready
+Module.onRuntimeInitialized = function () {
+    const ptr  = Module.ccall('xxd_get', 'number', ['string', 'number', 'number'], ['text', 0, 0]);
+    const text = Module.UTF8ToString(ptr);
+    console.log(text); // Hello, world!
+};
+```
+
+#### Verify exports
+
+```bash
+# Check that xxd_get / xxd_add are present in the WASM symbol table
+llvm-nm build_wasm/example/xxd_example.wasm | grep xxd_
+```
 
 ## License
 
