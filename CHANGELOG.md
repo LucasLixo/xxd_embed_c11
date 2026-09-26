@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-09-25
+
+This release adds a portable GNU Makefile so the project can be built without CMake. It mirrors `CMakeLists.txt` and produces byte-identical generated sources.
+
+### Added
+
+- **Portable `Makefile`**: builds `libxxd`, the `xxd` executable and the example with only GNU Make, a C11 compiler and a POSIX shell (`sed`, `awk`, `od`) plus one SHA-256 tool (`sha256sum`, `shasum` or `openssl`). Targets: `all`, `lib`, `xxd`, `example`, `run`, `clean` and `help`. Output goes to `build-make/`.
+- **Same options as CMake**: `XXD_BUILD_EXECUTABLE`, `XXD_BUILD_STATIC`, `XXD_BUILD_EXAMPLE` and `XXD_EMBED_ASM` (`AUTO`, `ON`, `OFF`), plus `BUILD_DIR`, `XXD_EMBED_BINARY_DIR`, `CC`, `AR`, `CFLAGS`, `LDFLAGS` and `V=1` for verbose output.
+- **All embedding strategies**: `.incbin` on GCC/Clang, hex array (using the built `xxd -I`, or an `od` + `awk` fallback when `XXD_BUILD_EXECUTABLE=OFF`), and `--embed-file` for Emscripten (`make CC=emcc AR=emar`). `XXD_EMBED_ASM=ON` is rejected under Emscripten, as in CMake.
+- **`xxd_embed` make function**: `$(call xxd_embed,<key>,<path>,<mime>,<target>)` is the Makefile equivalent of the CMake function. It collects generated objects in `<target>_EMBED_OBJS` (and `--embed-file` flags in `<target>_EMBED_LDFLAGS` for Emscripten).
+- **README section "Makefile (without CMake)"** documenting usage and the differences from the CMake build.
+
+### Changed
+
+- **`.gitignore`**: added `!/Makefile` so the root `Makefile` is tracked despite the generic `Makefile` rule for CMake output.
+- Project version bumped to `3.0.1`.
+
+### Notes
+
+- MSVC is not supported by the Makefile; use CMake there.
+- Embedded objects are linked directly into the target instead of through a `WHOLE_ARCHIVE` resource library, so startup constructors are still kept.
+
 ## [3.0.0] - 2026-06-08
 
 This release adds first-class WebAssembly support via Emscripten. Resources are embedded using Emscripten's native `--embed-file` mechanism instead of C arrays or assembly, and the public API (`xxd_get` / `xxd_add`) is exported to JavaScript automatically.
@@ -146,6 +168,7 @@ The following is the historical changelog from the original xxd utility:
 - **26.09.98**: Fixed `-i` output truncation
 - **27.10.98**: Fixed `-g` option parser. Added `-b` option for binary output
 
+[3.0.1]: https://github.com/LucasLixo/xxd_embed_c11/compare/3.0.0...3.0.1
 [3.0.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/2.0.0...3.0.0
 [2.0.0]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.1...2.0.0
 [1.1.1]: https://github.com/LucasLixo/xxd_embed_c11/compare/1.1.0...1.1.1

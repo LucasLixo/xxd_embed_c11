@@ -10,7 +10,11 @@ Embed resources into binary with CMake in a cross-platform way (Linux, Windows, 
 
 ## Release Notes
 
-### Version 3.0.0 (Current)
+### Version 3.0.1 (Current)
+
+- **Makefile support** — a portable GNU `Makefile` mirrors `CMakeLists.txt` for environments without CMake. It supports the same options (`XXD_BUILD_EXECUTABLE`, `XXD_BUILD_STATIC`, `XXD_BUILD_EXAMPLE`, `XXD_EMBED_ASM`), all embedding strategies (`.incbin`, hex array, Emscripten) and an `xxd_embed` make function. See [Makefile (without CMake)](#makefile-without-cmake).
+
+### Version 3.0.0
 
 - **WebAssembly (Emscripten) support** — `xxd_embed` detects Emscripten and switches to a dedicated WASM strategy: files are bundled via `--embed-file` and read from Emscripten's virtual FS at startup via `fopen`. No hex arrays, no `.incbin`. `xxd_get` and `xxd_add` are exported to JavaScript via `EMSCRIPTEN_KEEPALIVE`.
 - **`xxd` executable skipped for Emscripten** — the standalone tool is not built when cross-compiling to WASM (a WASM binary cannot serve as a host build tool).
