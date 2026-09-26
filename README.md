@@ -154,6 +154,30 @@ Calls are accumulated per source directory; at the end of configuration a single
 
 Override with `XXD_EMBED_ASM=ON` or `OFF` when cross-compiling or when the auto-detection does not match the toolchain.
 
+## Makefile (without CMake)
+
+A portable GNU Make build mirrors `CMakeLists.txt` for environments where CMake is unavailable. It needs GNU Make, a C11 compiler, a POSIX shell (`sed`, `awk`, `od`) and one of `sha256sum` / `shasum` / `openssl`. It accepts the same `XXD_BUILD_EXECUTABLE`, `XXD_BUILD_STATIC`, `XXD_BUILD_EXAMPLE` and `XXD_EMBED_ASM` options, and produces byte-identical generated sources.
+
+```
+make                          # libxxd, xxd and the example  -> build-make/
+make run                      # build and run the example
+make XXD_EMBED_ASM=OFF        # hex-array embedding
+make XXD_BUILD_STATIC=OFF     # shared libxxd
+make CC=emcc AR=emar          # WebAssembly (needs node for `make run`)
+make help                     # all options; BUILD_DIR, CC, CFLAGS, V=1 ...
+```
+
+To embed your own files, use the `xxd_embed` make function (the equivalent of the CMake function) and link the objects it collects:
+
+```make
+$(call xxd_embed,text,$(CURDIR)/text.txt,text/plain,my_app)
+
+my_app: main.o $(my_app_EMBED_OBJS) $(LIBXXD)
+	$(CC) -o $@ main.o $(my_app_EMBED_OBJS) $(LIBXXD_LINK) $(my_app_EMBED_LDFLAGS)
+```
+
+Differences from CMake: MSVC is not supported (use CMake), and embedded objects are linked directly instead of through a `WHOLE_ARCHIVE` resource library. Do not run an in-source `cmake .` in this directory, as it would overwrite the `Makefile`.
+
 ## Preprocessor macros
 
 These macros control the visibility of the public API symbols when including `xxd.h`.
